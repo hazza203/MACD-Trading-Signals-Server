@@ -7,7 +7,7 @@ const app = express()
 
 app.use(bodyParser.json())
 app.use(cors())
-mongoose.connect('', {useNewUrlParser: true})
+mongoose.connect(process.env.DATABASE_URL, {useNewUrlParser: true})
 const db = mongoose.connection
 db.on('error', error => console.error(error))
 db.once('open', () => console.log('Connected to db'))
