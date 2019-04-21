@@ -454,7 +454,7 @@ async function initPrice(coin){
 				}
 
 				//calculating signals distance from macd
-				coin.periods[period].distance = signal - macd
+				coin.periods[period].distance = macd - signal
 				
 				//Only flag vergance for 3 periods then reset it
 				if(coin.periods[period].vergence === true){
