@@ -1,3 +1,10 @@
+/********************************************
+
+				Created by Harry Parkinson
+				harry.m.parkinson@gmail.com
+
+*********************************************/
+
 const express = require('express')
 const fetch = require('node-fetch')
 const bodyParser = require('body-parser')
@@ -7,9 +14,13 @@ const app = express()
 app.use(bodyParser.json())
 app.use(cors())
 
+//The almighty hodl bag
 let coins = []
 
-app.get('/', (req, res) => {res.send(coins)})
+//Get all coin pairs
+app.get('/', (req, res) => {res.json(coins)})
+
+//Get all BTC coin pairs
 app.get('/btc', (req, res) => {
 	btcCoins = []
 	coins.forEach((coin) => {
@@ -17,8 +28,10 @@ app.get('/btc', (req, res) => {
 			btcCoins.push(coin)
 		}
 	})
-	res.send(btcCoins)
+	res.json(btcCoins)
 })
+
+//Get all ETH coin pairs
 app.get('/eth', (req, res) => {
 	ethcoins = []
 	coins.forEach((coin) => {
@@ -26,8 +39,10 @@ app.get('/eth', (req, res) => {
 			ethcoins.push(coin)
 		}
 	})
-	res.send(ethcoins)
+	res.json(ethcoins)
 })
+
+//Get all USDT coin pairs
 app.get('/usdt', (req, res) => {
 	usdtCoins = []
 	coins.forEach((coin) => {
@@ -35,7 +50,7 @@ app.get('/usdt', (req, res) => {
 			usdtCoins.push(coin)
 		}
 	})
-	res.send(usdtCoins)
+	res.json(usdtCoins)
 })
 
 app.listen(process.env.PORT||3000, () => {
@@ -52,6 +67,8 @@ getData()
 			Get new price
 			every 5 mins
 **************************/
+
+//This variable is used with modulus to check if the price update needs to be added to the kline
 let counter = 0
 setTimeout(() => {
 	setInterval(() => {
@@ -62,9 +79,10 @@ setTimeout(() => {
 			.then(data => {
 				coin.price = parseFloat(data.lastPrice)
 				coin.change = parseFloat(data.priceChangePercent)
-				for(interval in coin.intervals){
-					if(counter % coin.intervals[interval].modulo === 0){
-						calculateMacd(coin, coin.price, interval)	
+				for(period in coin.periods){
+					//Check if time period needs updating 
+					if(counter % coin.periods[period].modulo === 0){
+						calculateMacd(coin, coin.price, period)	
 					}
 				}
 				
@@ -85,15 +103,18 @@ async function getData(){
 	try {
 		let response = await fetch('https://api.binance.com/api/v1/exchangeInfo')
 		let data = await response.json()
+		//Time this, it is a very costly procedure
 		console.time('All coins initialized in')
 		for(var coin in data.symbols){
+			//Only get BTC, ETH, USDT pairs
 			if(['BTC', 'ETH', 'USDT'].includes(data.symbols[coin].quoteAsset)){
 					coins.push({
 					symbol: data.symbols[coin].symbol,
 					quoteAsset: data.symbols[coin].quoteAsset,
 					price: 0,
 					change: 0,
-					intervals: {
+					//Very big nested object
+					periods: {
 						m5: {
 							priceStamps: [],
 							macd: [],
@@ -228,21 +249,31 @@ async function getData(){
 						}
 					}
 				})		
-				await initPrice(coins[coins.length - 1])	
-				console.log(`initialized ${data.symbols[coin].symbol}`)				
+				await initPrice(coins[coins.length - 1])			
 			}
 		}
 		console.timeEnd('All coins initialized in')
+		console.log(`Coins added: ${coins.length}`)
 	} catch (err) {
 		console.log(err)
 	}
 	
 }
 
+/****************************************************************************************************************
+
+Here we needed to split the fetches into three different parts as there is a limit of a size 1000 array returned
+As we need to have enough data for the 5m and the weekly candles we couldn't fit this into 1 request.
+Process is: fetch -> loop through price history -> add each price if needed (every 5 min gets added, every 3rd
+5 min gets added to the 15m ect ect) and calc macd -> next fetch
+
+*****************************************************************************************************************/
 async function initPrice(coin){
 	try{
 		let response = await fetch(`https://api.binance.com/api/v1/klines?interval=5m&symbol=${coin.symbol}&limit=961`)
 		let data = await response.json()
+		//Counter is used with modulus to assert price should be added to each candle
+		// e.g ---- 30 mod 60 is 30 ---- 5 mod 30 is 0 ---- 30 mod 30 is 0
 		let counter=60
 		let m5=[] , m15=[] , m30=[] , h1=[]
 		for(var kline of data){
@@ -284,63 +315,91 @@ async function initPrice(coin){
 	}
 }
 
-	function shouldAdd(coin, interval, modulo, counter, arr, price){
+	/*
+		Uses modulus to assert if price should be added
+		Inits Macd if length == 26
+		Calcs Macd from then on
+	*/
+	function shouldAdd(coin, period, modulo, counter, arr, price){
 		if(counter % modulo === 0){
 			arr.push(price)
 			if(arr.length === 26){
-				coin.intervals[interval].priceStamps = arr
-				initMacd(coin, interval)
+				coin.periods[period].priceStamps = arr
+				initMacd(coin, period)
 			} else if(arr.length > 26){
-				calculateMacd(coin, price, interval)
+				calculateMacd(coin, price, period)
 			}
 		}
 	}
 
-	function initMacd(coin, interval){
+	/*
+		Initializes the MACD (moving average convergence divergence).
+
+		The first MACD is a 12SMA - 26SMA (Smooth moving average), so we 
+		need 26 prices to begin. We add this to the EMA (expotential)
+		as from here on out we will use EMA calculation, (just need the)
+		SMA to start.
+	*/
+	function initMacd(coin, period){
 		let total26=0.0
 		let total12=0.0
 
-		if(typeof coin.intervals[interval].priceStamps === 'undefined'){
-			console.log("Interval priceStamps is undefined: " + interval)
+		//Assert prices exist and we have 26 for this period
+
+		if(typeof coin.periods[period].priceStamps === 'undefined'){
+			console.log("period priceStamps is undefined: " + period)
 			console.log(coin)
 			return
 		}
 
-		if(coin.intervals[interval].priceStamps.length < 26){
-			console.log(`${coin.symbol} at interval: ${interval} is underlength`)
+		if(coin.periods[period].priceStamps.length < 26){
+			console.log(`${coin.symbol} at period: ${period} is underlength`)
 			console.log('Check if new addition')
 			return
 		}
 
+		//Create 26 period and 12 period totals
 		for(let i = 0; i < 26; i++){
 			if(i > 13){
-				total12 += parseFloat(coin.intervals[interval].priceStamps[i])
+				total12 += parseFloat(coin.periods[period].priceStamps[i])
 			}
-			total26 += parseFloat(coin.intervals[interval].priceStamps[i])
+			total26 += parseFloat(coin.periods[period].priceStamps[i])
 		}
 
+		//Macd is SMA 12 - SMA 26
+		//Store SMA's and MACD
     let macd = (total12 / 12) - (total26 / 26)
-    coin.intervals[interval].ema12 = total12 / 12
-    coin.intervals[interval].ema26 = total26 / 26
-    coin.intervals[interval].macd.push(macd)	      
-   	delete coin.intervals[interval].priceStamps
+    coin.periods[period].ema12 = total12 / 12
+    coin.periods[period].ema26 = total26 / 26
+    coin.periods[period].macd.push(macd)	  
+    //Not needed anymore, delete for javascript garbage collection    
+   	delete coin.periods[period].priceStamps
 			
 	}
 
-	function calculateMacd(coin, price, interval){
-		if(coin.intervals[interval].macd === 0){
-			initMacd(coin, interval)
+	/*
+
+	Main MACD calculation which calculates a 9 period EMA called the signal line
+	This is the line we use to detect if the MACD line has crossed over the signal 
+
+	*/
+
+	function calculateMacd(coin, price, period){
+		//If MACD isn't initialized yet, we initialize it 
+		//(still may not have enough data but that is handled in the init function)
+		if(coin.periods[period].macd === 0){
+			initMacd(coin, period)
 			return
 		}
 		//As this is called every 5 mins, we only calculate the
-		//MACD for the correct interval
+		//MACD for the correct period
 		// e.g. 15 min candle gets added when the counter is 15
 		//   			15 % 15 = 0
 		// but not at the 20 min mark (20 % 15 == 5)
 		
 
-		let ema12 = coin.intervals[interval].ema12
-		let ema26 = coin.intervals[interval].ema26
+		let ema12 = coin.periods[period].ema12
+		let ema26 = coin.periods[period].ema26
 		//Calculate new ema's
 		ema12 = (price - ema12) * 0.1538 + ema12
     ema26 = (price - ema26) * 0.07407 + ema26
@@ -348,63 +407,67 @@ async function initPrice(coin){
     let macd = ema12 - ema26
     
     //Set ema's and add macd
-    coin.intervals[interval].ema12 = ema12
-    coin.intervals[interval].ema26 = ema26
-    coin.intervals[interval].macd.push(macd)
+    coin.periods[period].ema12 = ema12
+    coin.periods[period].ema26 = ema26
+    coin.periods[period].macd.push(macd)
 
     // Need at least 9 macd's to make a signal
-    if(coin.intervals[interval].macd.length > 9){
+    if(coin.periods[period].macd.length > 9){
 
     	//Keep array length at 9
-    	coin.intervals[interval].macd.shift()
-			let macdArr = coin.intervals[interval].macd
+    	coin.periods[period].macd.shift()
+			let macdArr = coin.periods[period].macd
 
 			//If no signal created, first signal is a simple moving average
-			if(coin.intervals[interval].signal.length === 0){
+			if(coin.periods[period].signal.length === 0){
 
 				let signal = 0
 				macdArr.forEach((macd) => {
 					signal += macd
 				})
 				signal = signal / 9
-				coin.intervals[interval].signal.push(signal)
+				coin.periods[period].signal.push(signal)
 
 				//Otherwise continue with the ema calculation
 			}	else {
 
 				//Keeping signal array at length 9
 				//This is not needed for calculation, only keeping for reference
-				if(coin.intervals[interval].signal.length > 9){
-					coin.intervals[interval].signal.shift()
+				if(coin.periods[period].signal.length > 9){
+					coin.periods[period].signal.shift()
 				}
 
 				//Get signal, calculate and push
-				let lastSignal = coin.intervals[interval].signal[coin.intervals[interval].signal.length - 1]
+				let lastSignal = coin.periods[period].signal[coin.periods[period].signal.length - 1]
 				let signal = (macd - lastSignal) * 0.2 + lastSignal
-				coin.intervals[interval].signal.push(signal)
+				coin.periods[period].signal.push(signal)
 
 				//Checking for convergence / divergence 
-				//calculating signals distance from macd
-				if(coin.intervals[interval].distance > 0){
+				if(coin.periods[period].distance > 0){
 					if(signal <= macd){
-						coin.intervals[interval].vergence = true
+						coin.periods[period].vergence = true
 					}
-				} else if(coin.intervals[interval].distance < 0){
+				} else if(coin.periods[period].distance < 0){
 					if(signal >= macd){
-						coin.intervals[interval].vergence = true
-					}
-				}
-				coin.intervals[interval].distance = signal - macd
-				
-				if(coin.intervals[interval].vergence === true){
-					coin.intervals[interval].vergeTime++
-					if(coin.intervals[interval].vergeTime >= 3){
-						coin.intervals[interval].vergence = false
-						coin.intervals[interval].vergeTime = 0
+						coin.periods[period].vergence = true
 					}
 				}
 
-				coin.intervals[interval].pctSignalChange = ((signal - lastSignal) / lastSignal) * 100
+				//calculating signals distance from macd
+				coin.periods[period].distance = signal - macd
+				
+				//Only flag vergance for 3 periods then reset it
+				if(coin.periods[period].vergence === true){
+					coin.periods[period].vergeTime++
+					if(coin.periods[period].vergeTime > 3){
+						coin.periods[period].vergence = false
+						coin.periods[period].vergeTime = 0
+					}
+				}
+
+				//Calculate how much the signal has changed since the last signal
+				let lastMacd = coin.periods[period].macd[coin.periods[period].macd.length - 2]
+				coin.periods[period].pctSignalChange = ((macd - lastMacd) / lastMacd) * 100
 			}
 		}	
 	}
