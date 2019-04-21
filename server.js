@@ -404,7 +404,7 @@ async function initPrice(coin){
 					}
 				}
 
-				coin.intervals[interval].pctSignalChange = (signal - lastSignal / lastSignal) * 100
+				coin.intervals[interval].pctSignalChange = ((signal - lastSignal) / lastSignal) * 100
 			}
 		}	
 	}
