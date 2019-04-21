@@ -467,7 +467,11 @@ async function initPrice(coin){
 
 				//Calculate how much the signal has changed since the last signal
 				let lastMacd = coin.periods[period].macd[coin.periods[period].macd.length - 2]
-				coin.periods[period].pctSignalChange = ((macd - lastMacd) / lastMacd) * 100
+				let pctSignalChange = ((macd - lastMacd) / lastMacd) * 100
+				if(lastMacd < 0 && macd < 0){
+					pctSignalChange = pctSignalChange * -1
+				}
+				coin.periods[period].pctSignalChange = pctSignalChange
 			}
 		}	
 	}
