@@ -81,7 +81,7 @@ setTimeout(() => {
 					coins.splice(i, 1)
 				} else {
 					coin.price = parseFloat(data.lastPrice)
-					coin.change = parseFloat(data.priceChangePercent)
+					coin.change = parseFloat(data.priceChangePercent).toFixed(2)
 					for(period in coin.periods){
 						//Check if time period needs updating 
 						if(counter % coin.periods[period].modulo === 0){
