@@ -446,11 +446,11 @@ async function initPrice(coin){
 
 				//Checking for convergence / divergence 
 				if(coin.periods[period].distance > 0){
-					if(signal <= macd){
+					if(macd <= signal){
 						coin.periods[period].vergence = true
 					}
 				} else if(coin.periods[period].distance < 0){
-					if(signal >= macd){
+					if(macd >= signal){
 						coin.periods[period].vergence = true
 					}
 				}
