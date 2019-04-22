@@ -79,18 +79,16 @@ setTimeout(() => {
 			.then(data => {
 				if(data.weightedAvgPrice === '0'){
 					coins.splice(i, 1)
-					continue
-				}
-				coin.price = parseFloat(data.lastPrice)
-				coin.change = parseFloat(data.priceChangePercent)
-				for(period in coin.periods){
-					//Check if time period needs updating 
-					if(counter % coin.periods[period].modulo === 0){
-						calculateMacd(coin, coin.price, period)	
+				} else {
+					coin.price = parseFloat(data.lastPrice)
+					coin.change = parseFloat(data.priceChangePercent)
+					for(period in coin.periods){
+						//Check if time period needs updating 
+						if(counter % coin.periods[period].modulo === 0){
+							calculateMacd(coin, coin.price, period)	
+						}
 					}
 				}
-				
-
 			})
 			.catch(err => console.error(err))	
 		})
