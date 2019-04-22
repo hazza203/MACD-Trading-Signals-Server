@@ -73,10 +73,14 @@ let counter = 0
 setTimeout(() => {
 	setInterval(() => {
 		counter += 5
-		coins.forEach((coin) => {
+		coins.forEach((coin, i) => {
 			fetch(`https://api.binance.com/api/v1/ticker/24hr?symbol=${coin.symbol}`)
 			.then(response => response.json())
 			.then(data => {
+				if(data.weightedAvgPrice === '0'){
+					coins.splice(i, 1)
+					continue
+				}
 				coin.price = parseFloat(data.lastPrice)
 				coin.change = parseFloat(data.priceChangePercent)
 				for(period in coin.periods){
