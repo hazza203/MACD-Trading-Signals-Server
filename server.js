@@ -73,11 +73,14 @@ let counter = 0
 setTimeout(() => {
 	setInterval(() => {
 		counter += 5
-		coins.forEach((coin, i) => {
+		let length = coins.length
+
+		for(let i = coins.length - 1; i >= 0; i--)
+			let coin = coins[i]
 			fetch(`https://api.binance.com/api/v1/ticker/24hr?symbol=${coin.symbol}`)
 			.then(response => response.json())
 			.then(data => {
-				if(data.weightedAvgPrice === '0'){
+				if(data.lastId === '-1'){
 					coins.splice(i, 1)
 				} else {
 					coin.price = parseFloat(data.lastPrice)
@@ -115,6 +118,7 @@ async function getData(){
 					quoteAsset: data.symbols[coin].quoteAsset,
 					price: 0,
 					change: 0,
+					delist: false,
 					//Very big nested object
 					periods: {
 						m5: {
@@ -124,7 +128,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 5
@@ -136,7 +140,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 15
@@ -148,7 +152,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 30
@@ -160,7 +164,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 60
@@ -172,7 +176,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 120
@@ -184,7 +188,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 240
@@ -196,7 +200,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 360
@@ -208,7 +212,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 720
@@ -220,7 +224,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 1440
@@ -232,7 +236,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 4320
@@ -244,7 +248,7 @@ async function getData(){
 							ema12: 0,
 							ema26: 0,
 							distance: 0,
-							pctSignalChange: 0,
+							pctMacdChange: 0,
 							vergence: false,
 							vergeTime: 0,
 							modulo: 10080
@@ -456,12 +460,8 @@ async function initPrice(coin){
 				}
 
 				//calculating signals distance from macd
-				let distance = ((macd - signal)/ signal) * 100
-				if(macd < 0 && signal < 0){
-					distance = distance * -1
-				}
+				coin.periods[period].distance = ((macd - signal)/ Math.abs(signal)) * 100
 				
-				coin.periods[period].distance = distance
 				//Only flag vergance for 3 periods then reset it
 				if(coin.periods[period].vergence === true){
 					coin.periods[period].vergeTime++
@@ -473,11 +473,7 @@ async function initPrice(coin){
 
 				//Calculate how much the signal has changed since the last signal
 				let lastMacd = coin.periods[period].macd[coin.periods[period].macd.length - 2]
-				let pctSignalChange = ((macd - lastMacd) / lastMacd) * 100
-				if(lastMacd < 0 && macd < 0){
-					pctSignalChange = pctSignalChange * -1
-				}
-				coin.periods[period].pctSignalChange = pctSignalChange
+				coin.periods[period].pctMacdChange = ((macd - lastMacd) / Math.abs(lastMacd)) * 100
 			}
 		}	
 	}
