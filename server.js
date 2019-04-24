@@ -75,8 +75,9 @@ setTimeout(() => {
 		counter += 5
 		let length = coins.length
 
-		for(let i = coins.length - 1; i >= 0; i--)
-			let coin = coins[i]
+
+		for(let i = coins.length - 1; i >= 0; i--){
+			var coin = coins[i]
 			fetch(`https://api.binance.com/api/v1/ticker/24hr?symbol=${coin.symbol}`)
 			.then(response => response.json())
 			.then(data => {
@@ -94,7 +95,7 @@ setTimeout(() => {
 				}
 			})
 			.catch(err => console.error(err))	
-		})
+		}
 		console.log('Prices obtained from Binance')
 	},300000)
 }, 300000)
