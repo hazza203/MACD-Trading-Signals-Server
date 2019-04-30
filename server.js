@@ -73,32 +73,43 @@ let counter = 0
 setTimeout(() => {
 	setInterval(() => {
 		counter += 5
-		let length = coins.length
-
-
-		for(let i = coins.length - 1; i >= 0; i--){
-			var coin = coins[i]
-			fetch(`https://api.binance.com/api/v1/ticker/24hr?symbol=${coin.symbol}`)
-			.then(response => response.json())
-			.then(data => {
-				if(data.lastId === '-1'){
-					coins.splice(i, 1)
+		const promiseUrlArr = []
+		coins.forEach(coin => {
+			promiseUrlArr.push(`https://api.binance.com/api/v1/ticker/24hr?symbol=${coin.symbol}`)
+		})
+		Promise.all(promiseUrlArr.map(url => 
+				fetch(url).then(response => response.json())
+		))
+		.then(data => {
+			for(let i = coins.length - 1; i >= 0; i--){
+				if(data[i].lastId === -1){
+					if(coins[i].delist === true){
+						console.log(`Removing ${coins[i].symbol}`)
+						coins.splice(i, 1)
+					}
+					else {
+						//Flag for delist, if next time there is no price, then we delist
+						coins[i].delist = true
+					}
 				} else {
-					coin.price = parseFloat(data.lastPrice)
-					coin.change = parseFloat(data.priceChangePercent).toFixed(2)
-					for(period in coin.periods){
+					coins[i].price = parseFloat(data[i].lastPrice)
+					coins[i].change = parseFloat(data[i].priceChangePercent).toFixed(2)
+					coins[i].delist = false
+					for(period in coins[i].periods){
 						//Check if time period needs updating 
-						if(counter % coin.periods[period].modulo === 0){
-							calculateMacd(coin, coin.price, period)	
+						if(counter % coins[i].periods[period].modulo === 0){
+							calculateMacd(coins[i], coins[i].price, period)	
 						}
 					}
 				}
-			})
-			.catch(err => console.error(err))	
-		}
+			}
+		})
+		.catch(err => {
+			console.error('Error updating prices' + err)
+		})
 		console.log('Prices obtained from Binance')
 	},300000)
-}, 300000)
+}, 60000)
 
 
 /*************************
