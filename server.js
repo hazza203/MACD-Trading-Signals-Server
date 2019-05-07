@@ -94,7 +94,7 @@ setTimeout(() => {
 				} else {
 					coins[i].price = parseFloat(data[i].lastPrice)
 					coins[i].change = parseFloat(data[i].priceChangePercent).toFixed(2)
-					coins[i].volume = parseFloat(data[i].volume).toFixed(2)
+					coins[i].volume = parseFloat(data[i].quoteVolume).toFixed(2)
 					coins[i].delist = false
 					for(period in coins[i].periods){
 						//Check if time period needs updating 
